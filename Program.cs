@@ -86,12 +86,65 @@ namespace PokebotStats
 
             _client.UsingCommands(x =>
             {
-                x.PrefixChar = '!';
-                x.HelpMode = HelpMode.Public;
+                x.PrefixChar = '-';
+                x.HelpMode = HelpMode.Private;
             });
             #region Commands
             //pokemon stats
-            _client.GetService<CommandService>().CreateGroup("stats", x =>
+            _client.GetService<CommandService>().CreateGroup("money", x =>
+            {
+                _client.GetService<CommandService>().CreateCommand("amount")
+               .Description("PMs the user their account balance.")
+               .Do(async e =>
+               {
+                   //check the database for this user
+                   UserValues userVa = null;
+                   string param = "SELECT * FROM users";
+                   MySqlConnection con = null;
+                   MySqlCommand cmd = null;
+                   MySqlDataReader reader = null;
+                   con = new MySqlConnection(sql);
+                   cmd = new MySqlCommand(param, con);
+                   new GLaDOSbot.Message("Starting connection.");
+
+                   con.Open();
+
+                   reader = cmd.ExecuteReader();
+
+                   while (reader.Read())
+                   {
+                       string aName = reader.GetString("name");
+                       if (aName != null)
+                       {
+                           //check this for a name
+                           if (aName == e.User.Name)
+                           {
+                               userVa = new UserValues(
+                                   reader.GetString("name"),
+                                   reader.GetString("nameId"),
+                                   reader.GetInt32("money"),
+                                   reader.GetInt32("wins"),
+                                   reader.GetInt32("losses"),
+                                   reader.GetString("pokemon1"),
+                                   reader.GetString("pokemon2"),
+                                   reader.GetString("pokemon3"),
+                                   reader.GetString("pokemon4"),
+                                   reader.GetString("pokemon5"),
+                                   reader.GetString("pokemon6"),
+                                   reader.GetInt32("starterpokemon")
+                                   );
+                               new GLaDOSbot.Message($"Got the user {userVa.name}.");
+                           }
+                       }
+                   }
+
+                   con.Close();
+                   con = null;
+
+                   await e.User.SendMessage($"You currently have **₱{userVa.money}**.");
+               });
+            });
+               _client.GetService<CommandService>().CreateGroup("stats", x =>
             {
                 _client.GetService<CommandService>().CreateCommand("all")
                .Description("Shows the stats of all of a user's pokemon.")
@@ -170,77 +223,82 @@ namespace PokebotStats
                    new GLaDOSbot.Message("Done with pokemon. Length: " + pokemon.Count);
 
                    bool hasPokemon = false;
-                   bool pokemonExists = false;
+                   bool poke1 = false, poke2 = false, poke3 = false, poke4 = false, poke5 = false, poke6 = false;
+                   //bool pokemonExists = false;
+
+                   new GLaDOSbot.Message((int)e.User.Id + ": id");
 
                    foreach (Pokemon po in pokemon)
                    {
-                       pokemonExists = true;
-                       new GLaDOSbot.Message(po.name + "....yep");
+                       //pokemonExists = true;
+                       hasPokemon = true;
+
                        new GLaDOSbot.Message("ID:" + userVa.nameId + ",  " + po.userId);
                        if (po.userId == (int)e.User.Id && po.name == userVa.pokemon1)
                        {
-                           hasPokemon = true;
-                           //exists
-                           await e.Channel.SendMessage(
-                               $"__**{po.name}:**__" + '\n' +
-                               $"**HP:** {po.hp}, **Attack:** {po.attack}" + '\n' +
-                               $"**Defense:** {po.def}, **SpAtk:** {po.spatk}" + '\n' +
-                               $"**SpDef:** {po.spdef}, **Speed:** {po.speed}" + '\n' +
-                               $"**EXP:** {po.exp}, **Level:** {po.level}" + '\n' +
-                               $"**EXP for Next Level:** {po.nextLevel}" + '\n' +
-                               $"**Moves: {(string.IsNullOrEmpty(po.move1) ? "Unassigned" : po.move1)}, {(string.IsNullOrEmpty(po.move2) ? "Unassigned" : po.move2)}" + '\n' +
-                               $"{(string.IsNullOrEmpty(po.move3) ? "Unassigned" : po.move3)}, {(string.IsNullOrEmpty(po.move4) ? "Unassigned" : po.move4)}");
+                           if (!poke1)
+                           {
+                               poke1 = true;
+                               //exists
+                               await e.Channel.SendMessage(
+                                   $"__**{po.name}:**__" + '\n' +
+                                   $"**HP:** {po.hp}, **Attack:** {po.attack}" + '\n' +
+                                   $"**Defense:** {po.def}, **SpAtk:** {po.spatk}" + '\n' +
+                                   $"**SpDef:** {po.spdef}, **Speed:** {po.speed}" + '\n' +
+                                   $"**EXP:** {po.exp}, **Level:** {po.level}" + '\n' +
+                                   $"**EXP for Next Level:** {po.nextLevel}" + '\n' +
+                                   $"**Moves:** {(string.IsNullOrEmpty(po.move1) ? "Unassigned" : po.move1)}, {(string.IsNullOrEmpty(po.move2) ? "Unassigned" : po.move2)}" + '\n' +
+                                   $"{(string.IsNullOrEmpty(po.move3) ? "Unassigned" : po.move3)}, {(string.IsNullOrEmpty(po.move4) ? "Unassigned" : po.move4)}");
+                           }
                        }
                        else
                        {
-                           new GLaDOSbot.Message("Pokemon does not exist. Adding.");
-                           break;
+                           
                        }
                    }
 
-                   if (!pokemonExists)
+                   if (!poke1)
                    {
-                       if (userVa.pokemon1 != null)
-                       {
-                           List<MySqlParameter> paramList = new List<MySqlParameter>();
-                           paramList.Add(new MySqlParameter("name", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = userVa.pokemon1;
-                           paramList.Add(new MySqlParameter("userId", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = (int)e.User.Id;
-                           paramList.Add(new MySqlParameter("move1", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = "";
-                           paramList.Add(new MySqlParameter("move2", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = "";
-                           paramList.Add(new MySqlParameter("move3", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = "";
-                           paramList.Add(new MySqlParameter("move4", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = "";
-                           paramList.Add(new MySqlParameter("exp", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 0;
-                           paramList.Add(new MySqlParameter("statusEffect", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = "";
-                           paramList.Add(new MySqlParameter("heldItem", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = "";
-                           paramList.Add(new MySqlParameter("hp", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 15;
-                           paramList.Add(new MySqlParameter("attack", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 0;
-                           paramList.Add(new MySqlParameter("defense", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 0;
-                           paramList.Add(new MySqlParameter("spatk", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 0;
-                           paramList.Add(new MySqlParameter("spdef", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 0;
-                           paramList.Add(new MySqlParameter("speed", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 0;
-                           paramList.Add(new MySqlParameter("level", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 5;
-                           paramList.Add(new MySqlParameter("nextlevel", MySqlDbType.VarString));
-                           paramList[paramList.Count - 1].Value = 85;
+                       poke1 = true;
+                       new GLaDOSbot.Message("Pokemon does not exist. Adding.");
+                       List<MySqlParameter> paramList = new List<MySqlParameter>();
+                       paramList.Add(new MySqlParameter("name", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = userVa.pokemon1;
+                       paramList.Add(new MySqlParameter("userId", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = (int)e.User.Id;
+                       paramList.Add(new MySqlParameter("move1", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = "";
+                       paramList.Add(new MySqlParameter("move2", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = "";
+                       paramList.Add(new MySqlParameter("move3", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = "";
+                       paramList.Add(new MySqlParameter("move4", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = "";
+                       paramList.Add(new MySqlParameter("exp", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 0;
+                       paramList.Add(new MySqlParameter("statusEffect", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = "";
+                       paramList.Add(new MySqlParameter("heldItem", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = "";
+                       paramList.Add(new MySqlParameter("hp", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 15;
+                       paramList.Add(new MySqlParameter("attack", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 0;
+                       paramList.Add(new MySqlParameter("defense", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 0;
+                       paramList.Add(new MySqlParameter("spatk", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 0;
+                       paramList.Add(new MySqlParameter("spdef", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 0;
+                       paramList.Add(new MySqlParameter("speed", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 0;
+                       paramList.Add(new MySqlParameter("level", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 5;
+                       paramList.Add(new MySqlParameter("nextlevel", MySqlDbType.VarString));
+                       paramList[paramList.Count - 1].Value = 85;
 
-                           new GLaDOSbot.Message($"Adding pokemon {userVa.pokemon1}.");
-                           SetValueInTable("userpokemon", "SELECT * FROM userpokemon", "name,userId,move1,move2,move3,move4,exp,statusEffect,heldItem,hp,attack,defense,spatk,spdef,speed,level,nextlevel", "?name,?userId,?move1,?move2,?move3,?move4,?exp,?statusEffect,?heldItem,?hp,?attack,?defense,?spatk,?spdef,?speed,?level,?nextlevel", paramList);
-                       }
+                       new GLaDOSbot.Message($"Adding pokemon {userVa.pokemon1}.");
+                       SetValueInTable("userpokemon", "SELECT * FROM userpokemon", "name,userId,move1,move2,move3,move4,exp,statusEffect,heldItem,hp,attack,defense,spatk,spdef,speed,level,nextlevel", "?name,?userId,?move1,?move2,?move3,?move4,?exp,?statusEffect,?heldItem,?hp,?attack,?defense,?spatk,?spdef,?speed,?level,?nextlevel", paramList);
                    }
 
                    if (!hasPokemon)
@@ -303,6 +361,58 @@ namespace PokebotStats
 
                            new GLaDOSbot.Message($"Adding pokemon {userVa.pokemon1}.");
                            SetValueInTable("userpokemon", "SELECT * FROM userpokemon", "name,userId,move1,move2,move3,move4,exp,statusEffect,heldItem,hp,attack,defense,spatk,spdef,speed,level,nextlevel", "?name,?userId,?move1,?move2,?move3,?move4,?exp,?statusEffect,?heldItem,?hp,?attack,?defense,?spatk,?spdef,?speed,?level,?nextlevel", paramList);
+                       }
+                   }
+
+                   //we have the trainer, now we need to get the pokemon
+                   con = new MySqlConnection(sql);
+                   cmd = new MySqlCommand(param2, con);
+
+                   con.Open();
+
+                   reader = cmd.ExecuteReader();
+
+                   pokemon.Clear();
+
+                   while (reader.Read())
+                   {
+                       pokemon.Add(new Pokemon(reader.GetString("name"), int.Parse(reader.GetString("userId")), reader.GetString("move1"), reader.GetString("move2"),
+                           reader.GetString("move3"), reader.GetString("move4"), int.Parse(reader.GetString("exp")), reader.GetString("statusEffect"),
+                           reader.GetString("heldItem"), int.Parse(reader.GetString("hp")), int.Parse(reader.GetString("attack")), int.Parse(reader.GetString("defense")),
+                           int.Parse(reader.GetString("spatk")), int.Parse(reader.GetString("spdef")), int.Parse(reader.GetString("speed")), int.Parse(reader.GetString("level")), int.Parse(reader.GetString("nextlevel"))));
+                       new GLaDOSbot.Message($"Adding pokemon {reader.GetString("name")}.");
+                   }
+
+                   con.Close();
+                   con = null;
+                   reader = null;
+
+                   foreach (Pokemon po in pokemon)
+                   {
+                       //pokemonExists = true;
+                       hasPokemon = true;
+
+                       new GLaDOSbot.Message("ID:" + userVa.nameId + ",  " + po.userId);
+                       if (po.userId == (int)e.User.Id && po.name == userVa.pokemon1)
+                       {
+                           if (!poke1)
+                           {
+                               poke1 = true;
+                               //exists
+                               await e.Channel.SendMessage(
+                                   $"__**{po.name}:**__" + '\n' +
+                                   $"**HP:** {po.hp}, **Attack:** {po.attack}" + '\n' +
+                                   $"**Defense:** {po.def}, **SpAtk:** {po.spatk}" + '\n' +
+                                   $"**SpDef:** {po.spdef}, **Speed:** {po.speed}" + '\n' +
+                                   $"**EXP:** {po.exp}, **Level:** {po.level}" + '\n' +
+                                   $"**EXP for Next Level:** {po.nextLevel}" + '\n' +
+                                   $"**Moves:** {(string.IsNullOrEmpty(po.move1) ? "Unassigned" : po.move1)}, {(string.IsNullOrEmpty(po.move2) ? "Unassigned" : po.move2)}" + '\n' +
+                                   $"{(string.IsNullOrEmpty(po.move3) ? "Unassigned" : po.move3)}, {(string.IsNullOrEmpty(po.move4) ? "Unassigned" : po.move4)}");
+                           }
+                       }
+                       else
+                       {
+                           new GLaDOSbot.Message("INTERNAL ERROR......NO POKEMON FOUND AFTER ADDING.");
                        }
                    }
 
